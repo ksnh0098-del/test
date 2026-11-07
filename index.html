@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>좀비에게 점령당한 학교! 탈출 대작전</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      background-color: #1a1b26;
+      color: #fff;
+      font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: hidden;
+    }
+    #game-container {
+      position: relative;
+      border: 4px solid #414868;
+      border-radius: 8px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7);
+      background-color: #24283b;
+    }
+    /* 상단 HUD UI */
+    #hud {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 800px;
+      padding: 10px 20px;
+      background: #1f2335;
+      border-bottom: 2px solid #414868;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    .hud-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .hud-icon {
+      font-size: 20px;
+    }
+    /* 캔버스 */
+    canvas {
+      display: block;
+      background-color: #1a1a24;
+      image-rendering: pixelated;
+    }
+    /* 오버레이 (시작, 결과 화면) */
+    .overlay {
+      position: absolute;
+      top: 48px; /* HUD 높이 제외 */
+      left: 0;
+      width: 800px;
+      height: 576px;
+      background: rgba(15, 17, 26, 0.88);
+      backdrop-filter: blur(4px);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      z-index: 10;
+    }
+    .overlay h1 {
+      font-size: 34px;
+      color: #ff5370;
+      margin-bottom: 16px;
+      text-shadow: 2px 2px 0px #000;
+    }
+    .overlay h2 {
+      font-size: 30px;
+      margin-bottom: 15px;
+    }
+    .overlay p {
+      font-size: 16px;
+      color: #c0caf5;
+      line-height: 1.6;
+      margin-bottom: 20px;
+      max-width: 550px;
+    }
+    .guide-box {
+      background: rgba(41, 46, 66, 0.8);
+      border: 1px solid #565f89;
+      border-radius: 6px;
+      padding: 12px 20px;
+      margin-bottom: 24px;
+      text-align: left;
+      font-size: 14px;
+      color: #a9b1d6;
+    }
+    .btn {
+      padding: 12px 32px;
+      font-size: 18px;
+      font-weight: bold;
+      color: #1a1b26;
+      background: #7aa2f7;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px #3d59a1;
+    }
+    .btn:hover {
+      background: #89b4fa;
+      transform: translateY(-2px);
+      box-shadow: 0 6px #3d59a1;
+    }
+    .btn:active {
+      transform: translateY(2px);
+      box-shadow: 0 2px #3d59a1;
+    }
+    .hidden {
+      display: none !important;
+    }
+    /* 알림 메시지 */
+    #msg-banner {
+      position: absolute;
+      top: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(247, 118, 142, 0.9);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 15px;
+      font-weight: bold;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 5;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="game-container">
+    <!-- 화면 상단 HUD -->
+    <div id="hud">
+      <div class="hud-item"><span class="hud-icon">❤️</span> 생명: <span id="hud-hp">3 / 3</span></div>
+      <div class="hud-item"><span class="hud-icon">🔑</span> 열쇠: <span id="hud-keys">0 / 3</span></div>
+      <div class="hud-item"><span class="hud-icon">⏳</span> 남은 시간: <span id="hud-time">90초</span></div>
+    </div>
+
+    <!-- 게임 화면 캔버스 (800x576) -->
+    <canvas id="gameCanvas" width="800" height="576"></canvas>
+
+    <!-- 인게임 실시간 알림 배너 -->
+    <div id="msg-banner">알림 메시지</div>
+
+    <!-- 1. 시작 화면 -->
+    <div id="start-screen" class="overlay">
+      <h1>좀비에게 점령당한 학교!</h1>
+      <h3 style="color:#e0af68; margin-bottom: 16px;">~ 탈출 대작전 ~</h3>
+      <p>방과 후, 학교에 정체불명의 좀비 바이러스가 퍼졌습니다!<br>복도를 배회하는 좀비를 피해 열쇠 3개를 찾아 정문으로 탈출하세요.</p>
+      <div class="guide-box">
+        <strong>🎮 조작 방법:</strong><br>
+        - 이동: <span style="color:#7aa2f7;">WASD</span> 또는 <span style="color:#7aa2f7;">방향키</span><br>
+        <strong>🎯 미션:</strong><br>
+        - 맵 곳곳에 떨어진 <b>황금 열쇠 3개</b>를 모두 획득하면 정문이 개방됩니다.<br>
+        - 좀비가 가까이 오면 당신을 쫓아옵니다. 책상과 벽을 활용해 따돌리세요!
+      </div>
+      <button class="btn" id="start-btn">게임 시작하기</button>
+    </div>
+
+    <!-- 2. 결과 화면 (승리/패배) -->
+    <div id="result-screen" class="overlay hidden">
+      <h2 id="result-title">탈출 성공!</h2>
+      <p id="result-desc">무사히 학교를 탈출했습니다!</p>
+      <button class="btn" id="restart-btn">다시 시작하기</button>
+    </div>
+  </div>
+
+  <script>
+    /* ========================================================
+       1. 기본 설정 및 상수
+    ======================================================== */
+    const TILE_SIZE = 32;
+    const COLS = 25; // 800px
+    const ROWS = 18; // 576px
+
+    // 타일 종류
+    const TILE = {
+      FLOOR_HALL: 0,  // 복도 바닥
+      WALL: 1,        // 벽
+      DESK: 2,        // 책상/의자
+      LOCKER: 3,      // 사물함
+      FLOOR_ROOM: 4,  // 교실/교무실 바닥
+      EXIT_DOOR: 9    // 정문 출구
+    };
+
+    /* ========================================================
+       2. 학교 맵 구성 (25 x 18 타일)
+       - 좌상단: 1학년 교실
+       - 우상단: 2학년 교실
+       - 좌하단: 교무실 / 연구실
+       - 중앙: 긴 복도
+       - 하단 중앙: 학교 정문 출구
+    ======================================================== */
+    const MAP = [
+      [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+      [1,4,4,4,4,4,1,0,0,0,0,0,1,4,4,4,4,4,4,4,4,1,0,0,1],
+      [1,4,2,2,4,4,1,0,3,3,3,0,1,4,2,2,4,2,2,4,4,1,0,0,1],
+      [1,4,2,2,4,4,0,0,0,0,0,0,0,4,2,2,4,2,2,4,4,1,0,0,1],
+      [1,4,4,4,4,4,1,0,0,0,0,0,1,4,4,4,4,4,4,4,4,1,0,0,1],
+      [1,1,1,0,1,1,1,0,3,3,3,0,1,1,1,1,0,1,1,1,1,1,0,0,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,3,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,3,3,0,0,0,1],
+      [1,0,0,0,0,0,1,1,0,0,1,1,1,1,0,0,1,1,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,1,4,4,4,4,4,4,1,0,0,0,1,0,0,0,0,0,0,1],
+      [1,1,1,0,1,1,1,4,2,2,4,2,2,1,0,0,0,1,1,1,0,1,1,1,1],
+      [1,4,4,4,4,4,1,4,4,4,4,4,4,1,0,0,0,4,4,4,4,4,4,4,1],
+      [1,4,2,2,4,4,0,4,2,2,4,2,2,0,0,0,0,4,2,2,4,2,2,4,1],
+      [1,4,2,2,4,4,1,4,4,4,4,4,4,1,0,0,0,4,4,4,4,4,4,4,1],
+      [1,4,4,4,4,4,1,1,1,1,0,1,1,1,0,0,0,1,1,1,1,1,1,1,1],
+      [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,0,0,0,0,0,0,0,0,0,9,9,0,0,0,0,0,0,0,0,0,0,0,0,1],
+      [1,1,1,1,1,1,1,1,1,1,9,9,1,1,1,1,1,1,1,1,1,1,1,1,1]
+    ];
+
+    /* ========================================================
+       3. 게임 상태 변수
+    ======================================================== */
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    let gameState = 'START'; // 'START', 'PLAY', 'GAMEOVER', 'WIN'
+    let timer = 90;
+    let timerInterval = null;
+
+    // 키보드 입력 상태
+    const keysDown = {};
+
+    // 플레이어 객체
+    const player = {
+      x: 3 * TILE_SIZE + 4,
+      y: 6 * TILE_SIZE + 4,
+      w: 22,
+      h: 22,
+      speed: 130, // 초당 이동 픽셀
+      dir: 'down',
+      hp: 3,
+      keysCollected: 0,
+      invincibleTimer: 0 // 피격 후 무적 시간 (초)
+    };
+
+    // 열쇠 목록 (3개 고정 위치)
+    let keys = [];
+
+    // 좀비 목록 (3마리)
+    let zombies = [];
+
+    /* ========================================================
+       4. 초기화 함수
+    ======================================================== */
+    function initGame() {
+      // 플레이어 리셋
+      player.x = 2 * TILE_SIZE + 5;
+      player.y = 6 * TILE_SIZE + 5;
+      player.hp = 3;
+      player.keysCollected = 0;
+      player.dir = 'down';
+      player.invincibleTimer = 0;
+
+      // 열쇠 3개 배치 (교실 내부 구석들)
+      keys = [
+        { x: 3 * TILE_SIZE + 8,  y: 1 * TILE_SIZE + 8, collected: false }, // 1학년 교실
+        { x: 19 * TILE_SIZE + 8, y: 3 * TILE_SIZE + 8, collected: false }, // 2학년 교실
+        { x: 2 * TILE_SIZE + 8,  y: 13 * TILE_SIZE + 8, collected: false } // 교무실
+      ];
+
+      // 좀비 3마리 배치 및 순찰 경로 설정
+      zombies = [
+        {
+          x: 10 * TILE_SIZE, y: 6 * TILE_SIZE,
+          w: 22, h: 22, speed: 75,
+          dir: 'left', patrolTimer: 0,
+          wanderDir: { x: -1, y: 0 }
+        },
+        {
+          x: 16 * TILE_SIZE, y: 8 * TILE_SIZE,
+          w: 22, h: 22, speed: 80,
+          dir: 'down', patrolTimer: 0,
+          wanderDir: { x: 0, y: 1 }
+        },
+        {
+          x: 7 * TILE_SIZE, y: 15 * TILE_SIZE,
+          w: 22, h: 22, speed: 70,
+          dir: 'right', patrolTimer: 0,
+          wanderDir: { x: 1, y: 0 }
+        }
+      ];
+
+      // 시간 리셋
+      timer = 90;
+      updateHUD();
+
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        if (gameState === 'PLAY') {
+          timer--;
+          updateHUD();
+          if (timer <= 0) {
+            triggerGameOver("시간 초과! 좀비 무리에게 둘러싸였습니다...");
+          }
+        }
+      }, 1000);
+    }
+
+    function updateHUD() {
+      document.getElementById('hud-hp').innerText = `${player.hp} / 3`;
+      document.getElementById('hud-keys').innerText = `${player.keysCollected} / 3`;
+      document.getElementById('hud-time').innerText = `${timer}초`;
+    }
+
+    // 화면 안내 메시지 표시
+    let bannerTimeout = null;
+    function showMessage(text) {
+      const banner = document.getElementById('msg-banner');
+      banner.innerText = text;
